@@ -111,7 +111,8 @@ class SaveTagsToDatabase
                 throw new PermissionDeniedException;
             }
 
-            if (! $actor->can('bypassTagCounts', $discussion)) {
+            $isPrivate = $event->data['relationships']['recipientUsers'] !== null;
+            if (! $actor->can('bypassTagCounts', $discussion) && !$isPrivate) {
                 $this->validateTagCount('primary', $primaryCount);
                 $this->validateTagCount('secondary', $secondaryCount);
             }
