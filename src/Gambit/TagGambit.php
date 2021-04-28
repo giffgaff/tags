@@ -41,6 +41,11 @@ class TagGambit extends AbstractRegexGambit
     {
         $slugs = explode(',', trim($matches[1], '"'));
 
+        $tagsToPartiallyLoad = ['general-discussion', 'help-and-support'];
+        if (isset($slugs[0]) && in_array($slugs[0], $tagsToPartiallyLoad)) {
+            $search->getQuery()->whereRaw('flarum_discussions.last_posted_at > date_sub(now(), interval 1 year)');
+        }
+
         $search->getQuery()->where(function (Builder $query) use ($slugs, $negate) {
             foreach ($slugs as $slug) {
                 if ($slug === 'untagged') {
