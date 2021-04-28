@@ -39,12 +39,16 @@ class TagGambit extends AbstractRegexGambit
      */
     protected function conditions(AbstractSearch $search, array $matches, $negate)
     {
+        $actor = $search->getActor();
         $slugs = explode(',', trim($matches[1], '"'));
 
         $tagsToPartiallyLoad = ['general-discussion', 'help-and-support'];
         if (isset($slugs[0]) && in_array($slugs[0], $tagsToPartiallyLoad)) {
             $search->getQuery()->whereRaw('flarum_discussions.last_posted_at > date_sub(now(), interval 1 year)');
         }
+
+        $discussionsWithHiddenSubChildTags = $this->getDiscussionIdsWithHiddenSubscriptionChildTagsQry($actor->id, $slugs);
+        $search->getQuery()->whereNotIn('discussions.id', $discussionsWithHiddenSubChildTags);
 
         $search->getQuery()->where(function (Builder $query) use ($slugs, $negate) {
             foreach ($slugs as $slug) {
@@ -64,5 +68,31 @@ class TagGambit extends AbstractRegexGambit
                 }
             }
         });
+    }
+
+    /**
+     * Returns a single column query with all discussion IDs which belongs to a child tag the
+     * user has hidden.
+     *
+     * @param int $userId
+     * @param array|null $excludeTags
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function getDiscussionIdsWithHiddenSubscriptionChildTagsQry(int $userId, array $excludeTags = null)
+    {
+        $query = $this->tags->query();
+        $query->select('discussion_tag.discussion_id')
+            ->from('discussion_tag')
+            ->join('tag_user', 'tag_user.tag_id', '=', 'discussion_tag.tag_id')
+            ->join('tags', 'tag_user.tag_id', '=', 'tags.id')
+            ->where('tag_user.user_id', '=', $userId)
+            ->where('tag_user.subscription', 'hide')
+            ->whereNotNull("tags.parent_id");
+
+        if ($excludeTags !== null) {
+            $query->whereNotIn('tags.slug', $excludeTags);
+        }
+
+        return $query;
     }
 }
